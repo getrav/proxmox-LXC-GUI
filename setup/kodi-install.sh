@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-
 YW=`echo "\033[33m"`
 RD=`echo "\033[01;31m"`
 BL=`echo "\033[36m"`
@@ -87,49 +86,18 @@ set -e
     
 msg_ok "Set Up Hardware Acceleration"  
 
-msg_info "Setting Up kodi user"
-useradd -d /home/kodi -m kodi &>/dev/null
-gpasswd -a kodi audio &>/dev/null
-gpasswd -a kodi video &>/dev/null
-gpasswd -a kodi render &>/dev/null
-groupadd -r autologin &>/dev/null
-gpasswd -a kodi autologin &>/dev/null
-gpasswd -a kodi input &>/dev/null #to enable direct access to devices
-msg_ok "Set Up kodi user"
-
 msg_info "Installing lightdm"
 DEBIAN_FRONTEND=noninteractive apt-get install -y lightdm &>/dev/null
 echo "/usr/sbin/lightdm" > /etc/X11/default-display-manager
 msg_ok "Installed lightdm"
 
-msg_info "Installing kodi"
-apt-get update &>/dev/null
-apt-get install -y kodi &>/dev/null
-set +e
-alias die=''
-apt-get install --ignore-missing -y kodi-peripheral-joystick &>/dev/null
-alias die='EXIT=$? LINE=$LINENO error_exit'
-set -e
-msg_ok "Installed kodi"
-
-msg_info "Updating xsession"
-cat <<EOF >/usr/share/xsessions/kodi-alsa.desktop
-[Desktop Entry]
-Name=Kodi-alsa
-Comment=This session will start Kodi media center with alsa support
-Exec=env AE_SINK=ALSA kodi-standalone
-TryExec=env AE_SINK=ALSA kodi-standalone
-Type=Application
-EOF
-msg_ok "Updated xsession"
-
-msg_info "Setting up autologin"
-cat <<EOF >/etc/lightdm/lightdm.conf.d/autologin-kodi.conf
+msg_info "Setting up autologin for root"
+cat <<EOF >/etc/lightdm/lightdm.conf.d/autologin-root.conf
 [Seat:*]
-autologin-user=kodi
-autologin-session=kodi-alsa
+autologin-user=root
+autologin-session=lightdm-autologin
 EOF
-msg_ok "Set up autologin"
+msg_ok "Set up autologin for root"
 
 msg_info "Setting up device detection for xorg"
 apt-get install -y xserver-xorg-input-evdev &>/dev/null
@@ -197,6 +165,3 @@ msg_info "Starting X up"
 systemctl start lightdm
 ln -fs /lib/systemd/system/lightdm.service /etc/systemd/system/display-manager.service
 msg_info "Started X"
-
-
-
