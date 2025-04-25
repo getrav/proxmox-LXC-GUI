@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
-
 echo -e "Loading..."
-APP="kodi"
-var_disk="8"
-var_cpu="2"
-var_ram="2048"
+APP="LXC-GUI"
+var_disk="100"
+var_cpu="8"
+var_ram="16384"
 var_os="ubuntu"
 var_version="22.04"
 NSAPP=$(echo ${APP,,} | tr -d ' ')
