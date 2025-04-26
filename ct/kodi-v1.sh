@@ -2,7 +2,7 @@
 echo -e "Loading..."
 APP="LXC-GUI"
 var_disk="100"
-var_cpu="8"
+var_cpu="0"
 var_ram="16384"
 var_os="ubuntu"
 var_version="22.04"
@@ -65,8 +65,8 @@ fi
 function default_settings() {
 		echo -e "${DGN}Using ${var_os} Version: ${BGN}${var_version}${CL}"
 		
-    echo -e "${DGN}Using Container Type: ${BGN}Unprivileged${CL}"
-    CT_TYPE="1"
+    echo -e "${DGN}Using Container Type: ${BGN}Privileged${CL}"
+    CT_TYPE="0"
 		echo -e "${DGN}Using Root Password: ${BGN}Automatic Login${CL}"
 		PW=""
 		echo -e "${DGN}Using Container ID: ${BGN}$NEXTID${CL}"
