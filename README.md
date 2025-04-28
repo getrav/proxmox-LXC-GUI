@@ -9,7 +9,7 @@ based on great work of https://github.com/tteck/Proxmox
 ## To create a new Proxmox with GUI, run the following in the Proxmox Shell.
 
 ```yaml
-bash -c "$(wget -qLO - https://raw.githubusercontent.com/getrav/proxmox-LXC-GUI/refs/heads/dev/ct/lxc-gui.sh)"
+bash -c "$(wget -qLO - https://raw.githubusercontent.com/getrav/proxmox-LXC-GUI/refs/heads/dev/ct/blender-install.sh)"
 ```
 Kodi should be attached to TTY7 console
 
