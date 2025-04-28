@@ -4,7 +4,7 @@ echo -e "Loading..."
 APP="blender-desktop"
 var_disk="8"
 var_cpu="2"
-var_ram="2048"
+var_ram="16384"
 var_os="ubuntu"
 var_version="22.04"
 NSAPP=$(echo ${APP,,} | tr -d ' ')
@@ -28,6 +28,10 @@ set -o pipefail
 shopt -s expand_aliases
 alias die='EXIT=$? LINE=$LINENO error_exit'
 trap die ERR
+function command_exists() {
+  command -v "$1" >/dev/null 2>&1
+}
+
 function error_exit() {
   trap - ERR
   local reason="Unknown failure occurred."
@@ -43,6 +47,13 @@ else
     echo -e "⚠ User exited script \n"
     exit
 fi
+
+# Check if whiptail is installed
+if ! command_exists whiptail; then
+  echo -e "${RD}ERROR: whiptail is not installed. Please install it (e.g., apt install whiptail) and rerun the script.${CL}"
+  exit 1
+fi
+
 function header_info {
 echo -e "blender-desktop---------\n\n"
 }
@@ -200,15 +211,25 @@ else
 fi
 }
 function start_script() {
-if (whiptail --title "SETTINGS" --yesno "Use Default Settings?" --no-button Advanced 10 58); then
-  header_info
-  echo -e "${BL}Using Default Settings${CL}"
-  default_settings
-else
-  header_info
-  echo -e "${RD}Using Advanced Settings${CL}"
-  advanced_settings
-fi
+  whiptail --title "SETTINGS" --yesno "Use Default Settings?" --no-button Advanced 10 58
+  local exit_status=$?
+  case $exit_status in
+    0) # Yes/Default selected
+      header_info
+      echo -e "${BL}Using Default Settings${CL}"
+      default_settings
+      ;;
+    1) # No/Advanced selected
+      header_info
+      echo -e "${RD}Using Advanced Settings${CL}"
+      advanced_settings
+      ;;
+    *) # Cancelled or error
+      clear
+      echo -e "u26a0 User cancelled settings selection \n"
+      exit 1
+      ;;
+  esac
 }
 clear
 start_script
