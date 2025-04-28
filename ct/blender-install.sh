@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+
 YW=`echo "\033[33m"`
 RD=`echo "\033[01;31m"`
 BL=`echo "\033[36m"`
@@ -72,32 +73,38 @@ msg_info "Installing Dependencies"
 apt-get install -y curl &>/dev/null
 apt-get install -y sudo &>/dev/null
 apt-get install -y gnupg &>/dev/null
+apt-get install -y wget &>/dev/null # Added wget for Blender download
 msg_ok "Installed Dependencies"
 
-msg_info "Setting Up Hardware Acceleration"  
-apt-get -y install \
-    va-driver-all \
-    ocl-icd-libopencl1 &>/dev/null 
-set +e
-alias die=''
-apt-get install --ignore-missing -y beignet-opencl-icd &>/dev/null
-alias die='EXIT=$? LINE=$LINENO error_exit'
-set -e
-    
-msg_ok "Set Up Hardware Acceleration"  
+msg_info "Setting Up NVIDIA Drivers"
+NVIDIA_DRIVER_URL="https://international.download.nvidia.com/tesla/570.133.20/NVIDIA-Linux-x86_64-570.133.20.run"
+NVIDIA_DRIVER_FILE="/tmp/nvidia-driver.run"
+wget -q $NVIDIA_DRIVER_URL -O $NVIDIA_DRIVER_FILE
+chmod +x $NVIDIA_DRIVER_FILE
+$NVIDIA_DRIVER_FILE -q -a -s --no-kernel-modules
+rm $NVIDIA_DRIVER_FILE
+msg_ok "Set Up NVIDIA Drivers"  
+
+msg_info "Installing Blender LTS"
+# Fetch the latest LTS version (adjust if needed, e.g., 4.0.2)
+BLENDER_VERSION="4.0.2"
+BLENDER_MAJOR_VERSION=$(echo $BLENDER_VERSION | cut -d. -f1,2)
+BLENDER_URL="https://download.blender.org/release/Blender${BLENDER_MAJOR_VERSION}/blender-${BLENDER_VERSION}-linux-x64.tar.xz"
+wget -q $BLENDER_URL -O /tmp/blender.tar.xz
+mkdir -p /opt/blender
+tar -xf /tmp/blender.tar.xz -C /opt/blender --strip-components=1
+rm /tmp/blender.tar.xz
+# Optional: Create symlink for easier access
+ln -sf /opt/blender/blender /usr/local/bin/blender
+msg_ok "Installed Blender LTS"
+
+# Ensure lightdm configuration directory exists
+mkdir -p /etc/lightdm/lightdm.conf.d
 
 msg_info "Installing lightdm"
 DEBIAN_FRONTEND=noninteractive apt-get install -y lightdm &>/dev/null
 echo "/usr/sbin/lightdm" > /etc/X11/default-display-manager
 msg_ok "Installed lightdm"
-
-msg_info "Setting up autologin for root"
-cat <<EOF >/etc/lightdm/lightdm.conf.d/autologin-root.conf
-[Seat:*]
-autologin-user=root
-autologin-session=lightdm-autologin
-EOF
-msg_ok "Set up autologin for root"
 
 msg_info "Setting up device detection for xorg"
 apt-get install -y xserver-xorg-input-evdev &>/dev/null
@@ -141,7 +148,7 @@ msg_ok "Set up device detection for xorg"
 
 PASS=$(grep -w "root" /etc/shadow | cut -b6);
   if [[ $PASS != $ ]]; then
-msg_info "Customizing Container"
+msg_info "Customizing Container (Setting Root Autologin)"
 chmod -x /etc/update-motd.d/*
 touch ~/.hushlogin
 GETTY_OVERRIDE="/etc/systemd/system/container-getty@1.service.d/override.conf"
@@ -153,15 +160,20 @@ ExecStart=-/sbin/agetty --autologin root --noclear --keep-baud tty%I 115200,3840
 EOF
 systemctl daemon-reload
 systemctl restart $(basename $(dirname $GETTY_OVERRIDE) | sed 's/\.d//')
-msg_ok "Customized Container"
+msg_ok "Customized Container (Root Autologin Enabled)"
   fi
   
 msg_info "Cleaning up"
-apt-get autoremove >/dev/null
+apt-get autoremove -y >/dev/null
 apt-get autoclean >/dev/null
 msg_ok "Cleaned"
 
-msg_info "Starting X up"
+msg_info "Starting X server (LightDM)"
 systemctl start lightdm
 ln -fs /lib/systemd/system/lightdm.service /etc/systemd/system/display-manager.service
-msg_info "Started X"
+msg_ok "Started X server (LightDM)"
+
+echo -e "${GN}Installation Complete.${CL}"
+
+
+
