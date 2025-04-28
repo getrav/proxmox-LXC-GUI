@@ -230,7 +230,6 @@ export PCT_OPTIONS="
   -onboot 1
   -cores $CORE_COUNT
   -memory $RAM_SIZE
-  -unprivileged $CT_TYPE
   $PW
 "
 bash -c "$(wget -qLO - https://raw.githubusercontent.com/tteck/Proxmox/main/ct/create_lxc.sh)" || exit
@@ -238,6 +237,31 @@ bash -c "$(wget -qLO - https://raw.githubusercontent.com/tteck/Proxmox/main/ct/c
 msg_info "Pre-starting LXC Container"
 pct start $CTID
 msg_ok "Pre-started LXC Container"
+
+msg_info "Configuring NVIDIA GPU Passthrough for LXC $CTID"
+# Add NVIDIA devices - Verify device nodes and numbers on your Proxmox host if necessary
+cat <<EOF >> /etc/pve/lxc/${CTID}.conf
+lxc.cgroup2.devices.allow: c 195:* rwm
+lxc.cgroup2.devices.allow: c 511:* rwm # nvidia-uvm
+lxc.mount.entry: /dev/nvidia0 dev/nvidia0 none bind,optional,create=file
+lxc.mount.entry: /dev/nvidiactl dev/nvidiactl none bind,optional,create=file
+lxc.mount.entry: /dev/nvidia-modeset dev/nvidia-modeset none bind,optional,create=file
+lxc.mount.entry: /dev/nvidia-uvm dev/nvidia-uvm none bind,optional,create=file
+lxc.mount.entry: /dev/nvidia-uvm-tools dev/nvidia-uvm-tools none bind,optional,create=file
+EOF
+
+# Add hook to ensure devices are available
+cat <<EOF >> /etc/pve/lxc/${CTID}.conf
+lxc.hook.mount: /usr/share/lxc/hooks/nvidia
+EOF
+
+# Stop and restart the container to apply config changes
+msg_info "Restarting LXC $CTID to apply GPU config"
+pct stop $CTID
+pct start $CTID
+msg_ok "Restarted LXC $CTID with GPU config"
+
+msg_ok "Configured NVIDIA GPU Passthrough for LXC $CTID"
 
 VIDEO_GID=$(pct exec ${CTID} getent group video | cut -d: -f3)
 RENDER_GID=$(pct exec ${CTID} getent group render | cut -d: -f3)
@@ -251,21 +275,34 @@ msg_ok "Stopped LXC Container"
 
 LXC_CONFIG=/etc/pve/lxc/${CTID}.conf
 cat <<EOF >> $LXC_CONFIG
-lxc.cgroup2.devices.allow: c 226:0 rwm
-lxc.cgroup2.devices.allow: c 226:128 rwm
-lxc.cgroup2.devices.allow: c 29:0 rwm
-lxc.mount.entry: /dev/fb0 dev/fb0 none bind,optional,create=file
-lxc.mount.entry: /dev/dri dev/dri none bind,optional,create=dir
-lxc.mount.entry: /dev/dri/renderD128 dev/renderD128 none bind,optional,create=file
-# tty 7 - default for x
-lxc.cgroup2.devices.allow: c 4:7 rwm
-lxc.mount.entry: /dev/tty7 dev/tty7 none bind,optional,create=file
-# all input devices
-lxc.cgroup2.devices.allow: c 13:* rwm
+arch: amd64
+# Devices passed through
+dev0: /dev/uinput
+dev1: /dev/uhid
+dev2: /dev/nvidia0
+dev3: /dev/nvidiactl
+dev4: /dev/nvidia-uvm
+dev5: /dev/nvidia-uvm-tools
+# Capabilities and Cgroup rules
+lxc.cgroup2.devices.allow: a
+lxc.cap.drop:
+lxc.cgroup2.devices.allow: c 188:* rwm # /dev/hidraw* (Needed for some input devices)
+lxc.cgroup2.devices.allow: c 189:* rwm # /dev/hidraw* (Needed for some input devices)
+lxc.cgroup2.devices.allow: c 195:* rwm # NVIDIA character devices
+lxc.cgroup2.devices.allow: c 507:* rwm # NVIDIA UVM devices
+lxc.cgroup2.devices.allow: c 13:* rwm  # /dev/input
+lxc.cgroup2.devices.allow: c 226:* rwm # /dev/dri
+lxc.cgroup2.devices.allow: c 29:0 rwm  # /dev/fb0
+lxc.cgroup2.devices.allow: c 4:7 rwm   # /dev/tty7 (Keep for X server)
+lxc.cgroup2.devices.allow: c 116:* rwm # /dev/snd (Keep for sound)
+# Mount points
 lxc.mount.entry: /dev/input dev/input none bind,optional,create=dir
-# sound 
-lxc.cgroup2.devices.allow: c 116:* rwm
-lxc.mount.entry: /dev/snd dev/snd none bind,optional,create=dir
+lxc.mount.entry: /run/udev run/udev none bind,optional,create=dir
+lxc.mount.entry: /dev/dri dev/dri none bind,optional,create=dir
+lxc.mount.entry: /dev/fb0 dev/fb0 none bind,optional,create=file
+lxc.mount.entry: /dev/dri/renderD128 dev/dri/renderD128 none bind,optional,create=file
+lxc.mount.entry: /dev/tty7 dev/tty7 none bind,optional,create=file # (Keep for X server)
+lxc.mount.entry: /dev/snd dev/snd none bind,optional,create=dir # (Keep for sound)
 EOF
 if [ "$CT_TYPE" == "1" ]; then
     cat <<EOF >> $LXC_CONFIG
